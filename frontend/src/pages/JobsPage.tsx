@@ -4,7 +4,7 @@ import { useBulkInsertJobs, useGenerateContent, useBulkApply } from '../hooks/in
 import { useAuthStore } from '../store/auth.store.ts';
 import Layout from '../components/layout/Layout.tsx';
 import { Button, Select, Card } from '../components/ui/index.tsx';
-import type { JobFormRow, ResumeProfile, GeneratedContent } from '../types';
+import type { Job, JobFormRow, ResumeProfile, GeneratedContent } from '../types';
 
 const CHANNEL_OPTIONS = [
   { value: 1, label: 'Email' },
@@ -23,6 +23,39 @@ const emptyRow = (): JobFormRow => ({
   contactEmail: '', contactPhone: '', channel: 1,
 });
 
+// ── Email Preview Modal ───────────────────────────────────────
+function EmailPreviewModal({
+  item, onClose,
+}: {
+  item: { companyName: string; jobTitle: string; subject: string; body: string } | null;
+  onClose: () => void;
+}) {
+  if (!item) return null;
+  return (
+    <div
+      className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-xl w-full max-w-2xl max-h-[80vh] overflow-y-auto shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-6 py-4 border-b">
+          <div>
+            <h3 className="font-semibold text-gray-900">{item.companyName} — {item.jobTitle}</h3>
+            <p className="text-sm text-gray-500 mt-0.5">Subject: {item.subject}</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">×</button>
+        </div>
+        <div
+          className="px-6 py-4 text-sm text-gray-700 leading-relaxed"
+          dangerouslySetInnerHTML={{ __html: item.body }}
+        />
+      </div>
+    </div>
+  );
+}
+
 export default function JobsPage() {
   const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
@@ -30,6 +63,10 @@ export default function JobsPage() {
   const [tone, setTone] = useState('formal');
   const [generated, setGenerated] = useState<GeneratedContent[]>([]);
   const [step, setStep] = useState<'input' | 'review'>('input');
+  const [savedJobs, setSavedJobs] = useState<Job[]>([]);
+  const [preview, setPreview] = useState<{
+    companyName: string; jobTitle: string; subject: string; body: string;
+  } | null>(null);
 
   const { mutate: insertJobs, isPending: inserting } = useBulkInsertJobs();
   const { mutate: generateContent, isPending: generating } = useGenerateContent();
@@ -46,43 +83,38 @@ export default function JobsPage() {
     const validRows = rows.filter((r) => r.companyName && r.jobTitle);
     if (!validRows.length) return alert('Fill at least one company and job title');
 
-    // First save jobs to DB
     insertJobs(validRows, {
-      onSuccess: (savedJobs) => {
-        // Get profile from localStorage (saved after resume parse)
+      onSuccess: (jobs) => {
+        setSavedJobs(jobs);
         const profileRaw = localStorage.getItem('resumeProfile');
         const resumeProfile: ResumeProfile = profileRaw
           ? JSON.parse(profileRaw)
           : { fullName: user?.fullName || '', skills: [], experience: [], education: [], totalYearsExp: 0, email: '', phone: '', summary: '' };
 
-        // Generate AI content
         generateContent(
-          { jobs: savedJobs, resumeProfile, tone },
-          {
-            onSuccess: (results) => {
-              setGenerated(results);
-              setStep('review');
-            },
-          }
+          { jobs, resumeProfile, tone },
+          { onSuccess: (results) => { setGenerated(results); setStep('review'); } }
         );
       },
     });
   };
 
   const handleSendAll = () => {
-    const validRows = rows.filter((r) => r.companyName);
     const applications = generated
       .filter((g) => g.success)
-      .map((g, i) => ({
-        jobId: g.jobId,
-        channel: validRows[i]?.channel || 1,
-        contactEmail: validRows[i]?.contactEmail,
-        contactPhone: validRows[i]?.contactPhone,
-        emailSubject: g.emailSubject,
-        emailBody: g.emailBody,
-        whatsAppMsg: g.whatsappMessage,
-        resumePath: user?.resumeUrl,
-      }));
+      .map((g, i) => {
+        const job = savedJobs[i];
+        return {
+          jobId:        job?.jobId || g.jobId,
+          channel:      job?.channel || 1,
+          contactEmail: job?.contactEmail || '',
+          contactPhone: job?.contactPhone || '',
+          emailSubject: g.emailSubject,
+          emailBody:    g.emailBody,
+          whatsAppMsg:  g.whatsappMessage,
+          resumePath:   user?.resumeUrl,
+        };
+      });
 
     bulkApply(applications, {
       onSuccess: () => navigate('/dashboard'),
@@ -91,6 +123,9 @@ export default function JobsPage() {
 
   return (
     <Layout>
+      {/* Email Preview Modal */}
+      <EmailPreviewModal item={preview} onClose={() => setPreview(null)} />
+
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Jobs</h1>
@@ -186,18 +221,14 @@ export default function JobsPage() {
                     <button
                       onClick={() => removeRow(i)}
                       className="text-red-400 hover:text-red-600 text-lg leading-none"
-                    >
-                      ×
-                    </button>
+                    >×</button>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
           <div className="px-4 py-3 border-t border-gray-100">
-            <Button variant="ghost" size="sm" onClick={addRow}>
-              + Add Row
-            </Button>
+            <Button variant="ghost" size="sm" onClick={addRow}>+ Add Row</Button>
           </div>
         </Card>
       )}
@@ -206,13 +237,10 @@ export default function JobsPage() {
       {step === 'review' && (
         <div className="space-y-4">
           <div className="flex items-center justify-between mb-2">
-            <p className="text-gray-600 text-sm">
-              Review AI-generated content before sending
-            </p>
-            <Button variant="ghost" size="sm" onClick={() => setStep('input')}>
-              ← Back to Edit
-            </Button>
+            <p className="text-gray-600 text-sm">Review AI-generated content before sending</p>
+            <Button variant="ghost" size="sm" onClick={() => setStep('input')}>← Back to Edit</Button>
           </div>
+
           {generated.map((g, i) => (
             <Card key={g.jobId}>
               <div className="flex items-start justify-between mb-3">
@@ -226,6 +254,7 @@ export default function JobsPage() {
                   <span className="bg-red-100 text-red-700 text-xs px-2 py-0.5 rounded-full">Failed</span>
                 )}
               </div>
+
               {g.success ? (
                 <div className="space-y-3 text-sm">
                   {g.emailSubject && (
@@ -239,6 +268,21 @@ export default function JobsPage() {
                       <p className="text-xs text-gray-400 mb-1">WhatsApp Message</p>
                       <p className="text-gray-700 bg-gray-50 rounded p-2">{g.whatsappMessage}</p>
                     </div>
+                  )}
+
+                  {/* Preview Email Button */}
+                  {g.emailBody && (
+                    <button
+                      onClick={() => setPreview({
+                        companyName: rows[i]?.companyName || '',
+                        jobTitle:    rows[i]?.jobTitle || '',
+                        subject:     g.emailSubject || '',
+                        body:        g.emailBody || '',
+                      })}
+                      className="text-blue-600 hover:underline text-xs mt-1"
+                    >
+                      Preview full email →
+                    </button>
                   )}
                 </div>
               ) : (

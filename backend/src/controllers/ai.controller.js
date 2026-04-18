@@ -10,6 +10,7 @@ export const parseResume = asyncHandler(async (req, res) => {
 
 export const generateContent = asyncHandler(async (req, res) => {
   const { jobs, tone = 'formal', resumeProfile } = req.body;
+  console.log('=== GENERATE jobs[0] ===', JSON.stringify(jobs[0])); // add karo
   if (!jobs || !jobs.length) return error(res, 'Jobs array required', 400);
   const results = await aiService.generateBulkContent(jobs, resumeProfile, tone);
   return success(res, results, 'Content generated');

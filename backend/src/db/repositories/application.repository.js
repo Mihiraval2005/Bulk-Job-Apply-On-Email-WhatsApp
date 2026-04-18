@@ -28,3 +28,11 @@ export const getStats = async (userId) => {
   });
   return result.recordset[0];
 };
+
+export const getApplicationById = async (applicationId, userId) => {
+  const result = await executeProc('SP_Applications_GetById', {
+    ApplicationId: { type: sql.UniqueIdentifier, value: applicationId },
+    UserId:        { type: sql.UniqueIdentifier, value: userId },
+  });
+  return result.recordset[0] || null;
+};

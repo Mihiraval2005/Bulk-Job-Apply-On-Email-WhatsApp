@@ -1,6 +1,6 @@
 import * as queueService from '../services/queue.service.js';
 import * as appRepo from '../db/repositories/application.repository.js';
-import { success } from '../utils/response.js';
+import { success, error } from '../utils/response.js';
 import asyncHandler from '../utils/asyncHandler.js';
 
 export const bulkApply = asyncHandler(async (req, res) => {
@@ -20,6 +20,16 @@ export const getStats = asyncHandler(async (req, res) => {
 });
 
 export const retryApplication = asyncHandler(async (req, res) => {
-  await queueService.retryOne(req.params.id, req.user.userId);
+  const { id } = req.params;
+
+  // Check application exists and belongs to user
+  const app = await appRepo.getApplicationById(id, req.user.userId);
+  if (!app) return error(res, 'Application not found', 404);
+
+  // Only retry failed applications
+  const status = app.Status ?? app.status;
+  if (status !== 2) return error(res, 'Only failed applications can be retried', 400);
+
+  await queueService.retryOne(id, req.user.userId);
   return success(res, null, 'Retry queued');
 });

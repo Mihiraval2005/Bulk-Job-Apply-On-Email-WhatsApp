@@ -17,6 +17,8 @@ const getTransporter = () => {
 };
 
 export const sendEmail = async ({ to, subject, html, resumePath }) => {
+   console.log('=== RESUME PATH ===', resumePath);
+  console.log('=== FILE EXISTS ===', resumePath ? fs.existsSync(resumePath) : false);
   const mailer = getTransporter();
   const info = await mailer.sendMail({
     from: `"${env.SMTP_FROM_NAME}" <${env.SMTP_USER}>`,
