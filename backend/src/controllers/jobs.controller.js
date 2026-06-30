@@ -6,15 +6,16 @@ export const bulkInsert = asyncHandler(async (req, res) => {
   const { jobs } = req.body;
   const inserted = await jobRepo.bulkInsertJobs(req.user.userId, jobs);
   
-  // SQL Server PascalCase → camelCase normalize karo
   const normalized = inserted.map((j) => ({
-    jobId:        j.JobId,
-    companyName:  j.CompanyName,
-    jobTitle:     j.JobTitle,
-    contactEmail: j.ContactEmail,
-    contactPhone: j.ContactPhone,
-    channel:      j.Channel,
-    createdAt:    j.CreatedAt,
+    jobId:         j.jobid ?? j.JobId ?? j.JobId ?? j.id,
+    companyName:   j.companyname ?? j.CompanyName,
+    jobTitle:      j.jobtitle ?? j.JobTitle,
+    jobDescription:j.jobdescription ?? j.JobDescription ?? null,
+    requiredSkills:j.requiredskills ?? j.RequiredSkills ?? null,
+    contactEmail:  j.contactemail ?? j.ContactEmail ?? '',
+    contactPhone:  j.contactphone ?? j.ContactPhone ?? '',
+    channel:       j.channel ?? j.Channel,
+    createdAt:     j.createdat ?? j.CreatedAt,
   }));
 
   return success(res, normalized, `${normalized.length} jobs added`, 201);

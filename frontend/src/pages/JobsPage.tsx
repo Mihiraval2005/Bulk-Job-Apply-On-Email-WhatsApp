@@ -102,8 +102,8 @@ export default function JobsPage() {
   const handleSendAll = () => {
     const applications = generated
       .filter((g) => g.success)
-      .map((g, i) => {
-        const job = savedJobs[i];
+      .map((g, index) => {
+        const job = savedJobs.find((jobItem) => jobItem.jobId === g.jobId) ?? savedJobs[index];
         return {
           jobId:        job?.jobId || g.jobId,
           channel:      job?.channel || 1,

@@ -14,58 +14,74 @@ const CHANNEL = { EMAIL: 1, WHATSAPP: 2, BOTH: 3 };
 
 export const processOne = async (userId, app) => {
   const applicationId = app.applicationId || uuidv4();
+  const normalizedApp = {
+    ...app,
+    jobId: app.jobId || app.JobId || app.jobID || app.jobid || app.id,
+    channel: app.channel ?? app.Channel,
+    contactEmail: app.contactEmail || app.ContactEmail || app.contactemail || '',
+    contactPhone: app.contactPhone || app.ContactPhone || app.contactphone || '',
+    emailSubject: app.emailSubject || app.EmailSubject || app.emailsubject || '',
+    emailBody: app.emailBody || app.EmailBody || app.emailbody || '',
+    whatsAppMsg: app.whatsAppMsg || app.WhatsAppMsg || app.whatsappMsg || app.whatsappmsg || '',
+    resumePath: app.resumePath || app.ResumePath || app.resume_path || null,
+    retryCount: app.retryCount ?? app.RetryCount ?? 0,
+  };
 
-  if (!app.jobId) {
+  if (!normalizedApp.jobId) {
     logger.error('jobId is missing', { app });
     return;
   }
 
-  const resumeLink  = app.resumePath
-    ? `http://localhost:5000${app.resumePath}`
+  const resumeLink  = normalizedApp.resumePath
+    ? `http://localhost:5000${normalizedApp.resumePath}`
     : 'Resume not uploaded';
 
-  const whatsAppMsg = (app.whatsAppMsg || '').replace(/\{\{resumeLink\}\}/g, resumeLink);
-  const emailBody   = (app.emailBody   || '').replace(/\{\{resumeLink\}\}/g, resumeLink);
+  const whatsAppMsg = (normalizedApp.whatsAppMsg || '').replace(/\{\{resumeLink\}\}/g, resumeLink);
+  const emailBody   = (normalizedApp.emailBody   || '').replace(/\{\{resumeLink\}\}/g, resumeLink);
 
-  const absoluteResumePath = app.resumePath
-    ? path.join(__dirname, '../../uploads', path.basename(app.resumePath))
+  const absoluteResumePath = normalizedApp.resumePath
+    ? path.join(__dirname, '../../uploads', path.basename(normalizedApp.resumePath))
     : null;
 
   await upsertApplication({
-    applicationId, jobId: app.jobId, userId,
-    channel: app.channel, status: STATUS.PENDING,
-    emailSubject: app.emailSubject, emailBody, whatsAppMsg,
+    applicationId, jobId: normalizedApp.jobId, userId,
+    channel: normalizedApp.channel, status: STATUS.PENDING,
+    emailSubject: normalizedApp.emailSubject, emailBody, whatsAppMsg,
+    retryCount: normalizedApp.retryCount,
   });
 
   try {
-    if (app.channel === CHANNEL.EMAIL || app.channel === CHANNEL.BOTH) {
+    if (normalizedApp.channel === CHANNEL.EMAIL || normalizedApp.channel === CHANNEL.BOTH) {
       await sendEmail({
-        to: app.contactEmail,
-        subject: app.emailSubject,
+        to: normalizedApp.contactEmail,
+        subject: normalizedApp.emailSubject,
         html: emailBody,
         resumePath: absoluteResumePath,
       });
       await sleep(2000);
     }
 
-    if (app.channel === CHANNEL.WHATSAPP || app.channel === CHANNEL.BOTH) {
-      await sendWhatsApp({ to: app.contactPhone, message: whatsAppMsg });
+    if (normalizedApp.channel === CHANNEL.WHATSAPP || normalizedApp.channel === CHANNEL.BOTH) {
+      await sendWhatsApp({ to: normalizedApp.contactPhone, message: whatsAppMsg });
       await sleep(1000);
     }
 
     await upsertApplication({
-      applicationId, jobId: app.jobId, userId,
-      channel: app.channel, status: STATUS.SENT,
-      emailSubject: app.emailSubject, emailBody, whatsAppMsg,
+      applicationId, jobId: normalizedApp.jobId, userId,
+      channel: normalizedApp.channel, status: STATUS.SENT,
+      emailSubject: normalizedApp.emailSubject, emailBody, whatsAppMsg,
+      sentAt: new Date(),
+      retryCount: normalizedApp.retryCount,
     });
     logger.info(`Application sent`, { applicationId });
 
   } catch (err) {
     await upsertApplication({
-      applicationId, jobId: app.jobId, userId,
-      channel: app.channel, status: STATUS.FAILED,
-      emailSubject: app.emailSubject, emailBody, whatsAppMsg,
+      applicationId, jobId: normalizedApp.jobId, userId,
+      channel: normalizedApp.channel, status: STATUS.FAILED,
+      emailSubject: normalizedApp.emailSubject, emailBody, whatsAppMsg,
       errorMsg: err.message,
+      retryCount: normalizedApp.retryCount,
     });
     logger.error(`Application failed`, { applicationId, error: err.message });
   }
@@ -105,6 +121,7 @@ export const retryOne = async (applicationId, userId) => {
         emailBody:    app.EmailBody    || app.emailBody,
         whatsAppMsg:  app.WhatsAppMsg  || app.whatsAppMsg,
         resumePath:   null,
+        retryCount:   (app.RetryCount ?? app.retryCount ?? 0) + 1,
       });
     } catch (err) {
       logger.error('Retry failed', { applicationId, error: err.message });

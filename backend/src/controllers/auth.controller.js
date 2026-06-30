@@ -24,18 +24,18 @@ export const login = asyncHandler(async (req, res) => {
   const user = await userRepo.findByEmail(email);
   if (!user) return error(res, 'Invalid credentials', 401);
 
-  const isMatch = await bcrypt.compare(password, user.PasswordHash);
+  const isMatch = await bcrypt.compare(password, user.passwordhash);
   if (!isMatch) return error(res, 'Invalid credentials', 401);
 
-  const token = jwt.sign({ userId: user.UserId, email: user.Email }, env.JWT_SECRET, { expiresIn: env.JWT_EXPIRES_IN });
+  const token = jwt.sign({ userId: user.userid, email: user.email }, env.JWT_SECRET, { expiresIn: env.JWT_EXPIRES_IN });
   return success(res, {
     token,
-    user: { userId: user.UserId, email: user.Email, fullName: user.FullName, resumeUrl: user.ResumeUrl },
+    user: { userId: user.userid, email: user.email, fullName: user.fullname, resumeUrl: user.resumeurl },
   });
 });
 
 export const me = asyncHandler(async (req, res) => {
   const user = await userRepo.findByEmail(req.user.email);
   if (!user) return error(res, 'User not found', 404);
-  return success(res, { userId: user.UserId, email: user.Email, fullName: user.FullName, resumeUrl: user.ResumeUrl });
+  return success(res, { userId: user.userid, email: user.email, fullName: user.fullname, resumeUrl: user.resumeurl });
 });

@@ -1,28 +1,35 @@
-import { executeProc, sql } from '../../config/db.js';
+import { executeQuery } from '../../config/db.js';
 
 export const bulkInsertJobs = async (userId, jobs) => {
-  const table = new sql.Table();
-  table.columns.add('CompanyName',    sql.NVarChar(255));
-  table.columns.add('JobTitle',       sql.NVarChar(255));
-  table.columns.add('JobDescription', sql.NVarChar(sql.MAX));
-  table.columns.add('ContactEmail',   sql.NVarChar(255));
-  table.columns.add('ContactPhone',   sql.NVarChar(20));
-  table.columns.add('Channel',        sql.TinyInt);
+  const inserted = [];
 
-  jobs.forEach((j) => {
-    table.rows.add(j.companyName, j.jobTitle, j.jobDescription, j.contactEmail || null, j.contactPhone || null, j.channel);
-  });
+  for (const job of jobs) {
+    const result = await executeQuery(`
+      INSERT INTO t_jobs (
+        userid, companyname, jobtitle, jobdescription, requiredskills, contactemail, contactphone, channel, createdat, isactive
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), TRUE)
+      RETURNING *
+    `, [
+      userId,
+      job.companyName,
+      job.jobTitle,
+      job.jobDescription || null,
+      job.requiredSkills || null,
+      job.contactEmail || null,
+      job.contactPhone || null,
+      job.channel,
+    ]);
 
-  const result = await executeProc('SP_Jobs_BulkInsert', {
-    UserId: { type: sql.UniqueIdentifier, value: userId },
-    Jobs:   { type: sql.TVP,              value: table },
-  });
-  return result.recordset;
+    inserted.push(result.rows[0]);
+  }
+
+  return inserted;
 };
 
 export const getJobsByUser = async (userId) => {
-  const result = await executeProc('SP_Jobs_GetByUser', {
-    UserId: { type: sql.UniqueIdentifier, value: userId },
-  });
-  return result.recordset;
+  const result = await executeQuery(
+    'SELECT * FROM t_jobs WHERE userid = $1 ORDER BY createdat DESC',
+    [userId],
+  );
+  return result.rows;
 };
