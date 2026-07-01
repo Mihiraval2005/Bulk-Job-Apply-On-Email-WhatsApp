@@ -1,4 +1,6 @@
 import { getPool } from './db.js';
+import { fileURLToPath } from 'url';
+import path from 'path';
 
 export const initDatabase = async () => {
   const pool = await getPool();
@@ -66,3 +68,17 @@ export const initDatabase = async () => {
     await pool.query(statement);
   }
 };
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+if (process.argv[1] === __filename) {
+  try {
+    await initDatabase();
+    console.log('Database initialized successfully');
+    process.exit(0);
+  } catch (err) {
+    console.error('Failed to initialize database:', err);
+    process.exit(1);
+  }
+}

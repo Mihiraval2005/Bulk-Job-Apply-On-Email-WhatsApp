@@ -8,7 +8,7 @@
     "start": "node server.js",
     "dev": "nodemon server.js",
     "dev:debug": "nodemon --inspect server.js",
-    "db:init": "node ./scripts/create-postgres-tables.mjs"
+    "db:init": "node ./src/config/init-db.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.20.1",
