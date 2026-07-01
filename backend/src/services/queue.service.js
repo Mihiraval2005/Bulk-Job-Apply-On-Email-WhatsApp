@@ -17,14 +17,14 @@ export const processOne = async (userId, app) => {
   const normalizedApp = {
     ...app,
     jobId: app.jobId || app.JobId || app.jobID || app.jobid || app.id,
-    channel: app.channel ?? app.Channel,
+    channel: app.channel ?? app.Channel ?? app.channelId,
     contactEmail: app.contactEmail || app.ContactEmail || app.contactemail || '',
     contactPhone: app.contactPhone || app.ContactPhone || app.contactphone || '',
     emailSubject: app.emailSubject || app.EmailSubject || app.emailsubject || '',
     emailBody: app.emailBody || app.EmailBody || app.emailbody || '',
     whatsAppMsg: app.whatsAppMsg || app.WhatsAppMsg || app.whatsappMsg || app.whatsappmsg || '',
     resumePath: app.resumePath || app.ResumePath || app.resume_path || null,
-    retryCount: app.retryCount ?? app.RetryCount ?? 0,
+    retryCount: app.retryCount ?? app.RetryCount ?? app.retrycount ?? 0,
   };
 
   if (!normalizedApp.jobId) {
@@ -52,6 +52,10 @@ export const processOne = async (userId, app) => {
 
   try {
     if (normalizedApp.channel === CHANNEL.EMAIL || normalizedApp.channel === CHANNEL.BOTH) {
+      if (!normalizedApp.contactEmail) {
+        throw new Error('Missing contactEmail for email application');
+      }
+
       await sendEmail({
         to: normalizedApp.contactEmail,
         subject: normalizedApp.emailSubject,
@@ -62,6 +66,10 @@ export const processOne = async (userId, app) => {
     }
 
     if (normalizedApp.channel === CHANNEL.WHATSAPP || normalizedApp.channel === CHANNEL.BOTH) {
+      if (!normalizedApp.contactPhone) {
+        throw new Error('Missing contactPhone for WhatsApp application');
+      }
+
       await sendWhatsApp({ to: normalizedApp.contactPhone, message: whatsAppMsg });
       await sleep(1000);
     }
@@ -101,6 +109,11 @@ export const enqueueBulk = async (userId, applications) => {
 };
 
 export const retryOne = async (applicationId, userId) => {
+  if (!applicationId) {
+    logger.error('Retry requested with missing applicationId');
+    return;
+  }
+
   const app = await getApplicationById(applicationId, userId);
   if (!app) {
     logger.error('Application not found for retry', { applicationId });
@@ -113,15 +126,15 @@ export const retryOne = async (applicationId, userId) => {
     try {
       await processOne(userId, {
         applicationId,
-        jobId:        app.JobId        || app.jobId,
-        channel:      app.Channel      || app.channel,
-        contactEmail: app.ContactEmail || app.contactEmail || '',
-        contactPhone: app.ContactPhone || app.contactPhone || '',
-        emailSubject: app.EmailSubject || app.emailSubject,
-        emailBody:    app.EmailBody    || app.emailBody,
-        whatsAppMsg:  app.WhatsAppMsg  || app.whatsAppMsg,
+        jobId:        app.jobid || app.JobId || app.jobId || app.id,
+        channel:      app.channel ?? app.Channel,
+        contactEmail: app.contactemail || app.ContactEmail || app.contactEmail || '',
+        contactPhone: app.contactphone || app.ContactPhone || app.contactPhone || '',
+        emailSubject: app.emailsubject || app.EmailSubject || app.emailSubject || '',
+        emailBody:    app.emailbody || app.EmailBody || app.emailBody || '',
+        whatsAppMsg:  app.whatsappmsg || app.WhatsAppMsg || app.whatsAppMsg || '',
         resumePath:   null,
-        retryCount:   (app.RetryCount ?? app.retryCount ?? 0) + 1,
+        retryCount:   (app.retrycount ?? app.RetryCount ?? app.retryCount ?? 0) + 1,
       });
     } catch (err) {
       logger.error('Retry failed', { applicationId, error: err.message });
