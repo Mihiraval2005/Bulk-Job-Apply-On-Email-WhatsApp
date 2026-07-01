@@ -1,6 +1,7 @@
 import { createApp } from './src/app.js';
 import env from './src/config/env.js';
 import { getPool } from './src/config/db.js';
+import { initDatabase } from './src/config/init-db.js';
 import logger from './src/utils/logger.js';
 import fs from 'fs';
 
@@ -13,6 +14,9 @@ const startServer = async () => {
 
   try {
     await getPool();
+    if (env.NODE_ENV !== 'production') {
+      await initDatabase();
+    }
     app.listen(env.PORT, () => {
       logger.info(`BulkApply API running on port ${env.PORT} [${env.NODE_ENV}]`);
     });
