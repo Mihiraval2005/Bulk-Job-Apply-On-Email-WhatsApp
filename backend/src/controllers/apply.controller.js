@@ -21,6 +21,7 @@ export const getStats = asyncHandler(async (req, res) => {
 
 export const retryApplication = asyncHandler(async (req, res) => {
   const { id } = req.params;
+  if (!id) return error(res, 'Application id is required', 400);
 
   // Check application exists and belongs to user
   const app = await appRepo.getApplicationById(id, req.user.userId);

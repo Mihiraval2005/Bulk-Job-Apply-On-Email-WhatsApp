@@ -82,10 +82,11 @@ export default function DashboardPage() {
                 const retryCount   = app.retryCount   ?? app.RetryCount   ?? 0;
                 const status       = app.status       ?? app.Status       ?? 0;
                 const errorMsg     = app.errorMsg     || app.ErrorMsg     || null;
-                const appId        = app.applicationId || app.ApplicationId;
+                const appId        = app.applicationId || app.ApplicationId || app.applicationid || app.ApplicationId || '';
+                const rowKey       = appId || `${companyName}-${jobTitle}-${sentAt || 'no-date'}`;
 
                 return (
-                  <tr key={appId} className="hover:bg-gray-50">
+                  <tr key={rowKey} className="hover:bg-gray-50">
                     <td className="px-4 py-3 font-medium text-gray-900">{companyName}</td>
                     <td className="px-4 py-3 text-gray-600">{jobTitle}</td>
                     <td className="px-4 py-3"><Badge label={channelLabel} /></td>
@@ -105,7 +106,7 @@ export default function DashboardPage() {
                         </button>
 
                         {/* Retry — only for failed */}
-                        {status === 2 && (
+                        {status === 2 && appId && (
                           <Button
                             size="sm"
                             variant="secondary"
@@ -114,6 +115,9 @@ export default function DashboardPage() {
                           >
                             Retry
                           </Button>
+                        )}
+                        {status === 2 && !appId && (
+                          <span className="text-xs text-red-500">Retry unavailable</span>
                         )}
                       </div>
                       {status === 2 && errorMsg && (
