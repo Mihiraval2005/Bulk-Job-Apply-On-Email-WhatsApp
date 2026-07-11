@@ -10,6 +10,8 @@ BEGIN
     Channel       TINYINT           NOT NULL,   -- 1=Email 2=WhatsApp 3=Both
     Status        TINYINT           NOT NULL  DEFAULT 0,
     -- 0=Pending 1=Sent 2=Failed 3=Opened(email read receipt)
+    ContactEmail  NVARCHAR(255)     NULL,
+    ContactPhone  NVARCHAR(20)      NULL,
     EmailSubject  NVARCHAR(512)     NULL,
     EmailBody     NVARCHAR(MAX)     NULL,
     WhatsAppMsg   NVARCHAR(MAX)     NULL,

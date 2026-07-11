@@ -8,19 +8,44 @@ const connectionString = env.DB_URL || `postgresql://${env.DB_USER}:${env.DB_PAS
 
 const poolConfig = {
   connectionString,
-  ssl: env.DB_SSL === 'true' ? { rejectUnauthorized: false } : undefined,
+  ssl: env.DB_SSL === 'true' || env.NODE_ENV === 'production' 
+    ? { rejectUnauthorized: false } 
+    : false,
   max: 10,
-  min: 2,
-  idleTimeoutMillis: 30000,
+  min: 1,
+  idleTimeoutMillis: 10000,        // Disconnect idle connections before Neon's 5min timeout
+  connectionTimeoutMillis: 5000,   // Timeout for acquiring connection from pool
+  keepAlives: true,                // Enable TCP keep-alive
+  keepAlivesIdleTimeout: 30000,    // Send keep-alive every 30 seconds
+  statement_timeout: 30000,        // Statement timeout
+  query_timeout: 30000,            // Query timeout
 };
 
 let pool = null;
+let reconnectAttempts = 0;
+const MAX_RECONNECT_ATTEMPTS = 3;
+const RECONNECT_DELAY = 5000;
 
 export const getPool = async () => {
   if (!pool) {
     pool = new Pool(poolConfig);
+    
     pool.on('error', (err) => {
-      logger.error('Unexpected PostgreSQL pool error', err);
+      logger.error('PostgreSQL pool error', { 
+        message: err.message,
+        code: err.code,
+        severity: err.severity 
+      });
+      
+      // Recreate pool on connection errors
+      if (err.code === 'ECONNREFUSED' || err.code === 'ETIMEDOUT') {
+        pool = null;
+      }
+    });
+
+    pool.on('connect', () => {
+      reconnectAttempts = 0;
+      logger.info('PostgreSQL pool connection established');
     });
   }
 
@@ -38,8 +63,39 @@ const normalizeParams = (params = []) => {
 };
 
 export const executeQuery = async (query, params = []) => {
-  const db = await getPool();
-  return db.query(query, normalizeParams(params));
+  let attempts = 0;
+  const maxAttempts = 3;
+
+  while (attempts < maxAttempts) {
+    try {
+      const db = await getPool();
+      const result = await db.query(query, normalizeParams(params));
+      return result;
+    } catch (error) {
+      attempts++;
+      
+      if (error.code === 'ECONNREFUSED' || error.message.includes('terminator') || error.message.includes('Connection terminated')) {
+        logger.warn(`Query attempt ${attempts}/${maxAttempts} failed, retrying...`, { 
+          error: error.message,
+          code: error.code 
+        });
+        
+        // Reset pool to force reconnection
+        pool = null;
+        
+        if (attempts < maxAttempts) {
+          // Exponential backoff
+          await new Promise(r => setTimeout(r, RECONNECT_DELAY * attempts));
+          continue;
+        }
+      }
+      
+      // If not a recoverable connection error, throw immediately
+      throw error;
+    }
+  }
+
+  throw new Error('Failed to execute query after retries');
 };
 
 export const executeProc = async (procName, params = {}) => {

@@ -3,13 +3,15 @@ import { executeQuery } from '../../config/db.js';
 export const upsertApplication = async (data) => {
   const result = await executeQuery(`
     INSERT INTO t_applications (
-      applicationid, jobid, userid, channel, status, emailsubject, emailbody, whatsappmsg, errormsg, sentat, retrycount, createdat, updatedat
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), NOW())
+      applicationid, jobid, userid, channel, status, contactemail, contactphone, emailsubject, emailbody, whatsappmsg, errormsg, sentat, retrycount, createdat, updatedat
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW(), NOW())
     ON CONFLICT (applicationid) DO UPDATE SET
       jobid = EXCLUDED.jobid,
       userid = EXCLUDED.userid,
       channel = EXCLUDED.channel,
       status = EXCLUDED.status,
+      contactemail = EXCLUDED.contactemail,
+      contactphone = EXCLUDED.contactphone,
       emailsubject = EXCLUDED.emailsubject,
       emailbody = EXCLUDED.emailbody,
       whatsappmsg = EXCLUDED.whatsappmsg,
@@ -24,6 +26,8 @@ export const upsertApplication = async (data) => {
     data.userId,
     data.channel,
     data.status,
+    data.contactEmail || null,
+    data.contactPhone || null,
     data.emailSubject || null,
     data.emailBody || null,
     data.whatsAppMsg || null,

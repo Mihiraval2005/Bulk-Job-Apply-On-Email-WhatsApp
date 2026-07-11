@@ -6,7 +6,7 @@ const env = {
 
    
   DB_URL: process.env.DIRECT_URL || process.env.DATABASE_URL ||  '',
-  DB_SSL: process.env.DB_SSL || 'false',
+  DB_SSL: process.env.DB_SSL !== 'false' && process.env.NODE_ENV === 'production' ? 'true' : (process.env.DB_SSL || 'false'),
 
   JWT_SECRET: process.env.JWT_SECRET || 'changeme_in_production',
   JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN || '7d',

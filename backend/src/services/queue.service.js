@@ -46,6 +46,8 @@ export const processOne = async (userId, app) => {
   await upsertApplication({
     applicationId, jobId: normalizedApp.jobId, userId,
     channel: normalizedApp.channel, status: STATUS.PENDING,
+    contactEmail: normalizedApp.contactEmail,
+    contactPhone: normalizedApp.contactPhone,
     emailSubject: normalizedApp.emailSubject, emailBody, whatsAppMsg,
     retryCount: normalizedApp.retryCount,
   });
@@ -77,6 +79,8 @@ export const processOne = async (userId, app) => {
     await upsertApplication({
       applicationId, jobId: normalizedApp.jobId, userId,
       channel: normalizedApp.channel, status: STATUS.SENT,
+      contactEmail: normalizedApp.contactEmail,
+      contactPhone: normalizedApp.contactPhone,
       emailSubject: normalizedApp.emailSubject, emailBody, whatsAppMsg,
       sentAt: new Date(),
       retryCount: normalizedApp.retryCount,
@@ -87,6 +91,8 @@ export const processOne = async (userId, app) => {
     await upsertApplication({
       applicationId, jobId: normalizedApp.jobId, userId,
       channel: normalizedApp.channel, status: STATUS.FAILED,
+      contactEmail: normalizedApp.contactEmail,
+      contactPhone: normalizedApp.contactPhone,
       emailSubject: normalizedApp.emailSubject, emailBody, whatsAppMsg,
       errorMsg: err.message,
       retryCount: normalizedApp.retryCount,
